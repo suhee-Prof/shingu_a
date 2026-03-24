@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>점심 메뉴 룰렛</title>
+
+  <meta name="theme-color" content="#ff8a65" />
+  <meta name="description" content="룰렛을 돌려 오늘의 점심 메뉴를 선택하는 PWA 앱" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="점심룰렛" />
+
+  <link rel="manifest" href="/shingu_a/manifest.json" />
+  <link rel="icon" href="/shingu_a/icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/shingu_a/icon.png" />
+
+  <meta property="og:title" content="점심 메뉴 룰렛" />
+  <meta property="og:description" content="오늘 뭐 먹지? 룰렛으로 점심 메뉴를 골라보세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://suhee-prof.github.io/shingu_a/" />
+  <meta property="og:image" content="https://suhee-prof.github.io/shingu_a/og.png" />
+  <meta property="og:locale" content="ko_KR" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      background: linear-gradient(135deg, #fff7f2, #fffdf7);
+      color: #2d2d2d;
+      overflow-x: hidden;
+    }
+
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0 0 10px;
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 28px;
+      font-size: 1.05rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #f1e6d9;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+      padding: 22px;
+      backdrop-filter: blur(10px);
+    }
+
+    .wheel-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      width: min(78vw, 520px);
+      height: min(78vw, 520px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 6px;
+    }
+
+    /* 수정된 포인터: 꼭짓점이 아래(룰렛 안쪽)를 향함 */
+    .pointer {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 34px solid #ff6b6b;
+      z-index: 20;
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+    }
+
+    .wheel-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.15));
+      box-shadow:
+        inset 0 0 0 10px rgba(255,255,255,0.8),
+        inset 0 0 0 16px #f3d9b1,
+        0 14px 35px rgba(0,0,0,0.1);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #wheelContainer {
+      width: 100%;
+      height: 100%;
+      transform: rotate(0deg);
+      border-radius: 50%;
+      overflow: visible;
+      position: relative;
+      z-index: 2;
+    }
+
+    #wheelSvg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .spin-btn {
+      border: none;
+      background: linear-gradient(135deg, #ff9a62, #ff6b6b);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 14px 26px;
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(255, 107, 107, 0.25);
+      transition: transform 0.15s ease, opacity 0.2s ease;
+    }
+
+    .spin-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .spin-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .result-box {
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
+      padding: 18px;
+      border-radius: 18px;
+      background: #fff8eb;
+      border: 1px solid #f4dfb6;
+    }
+
+    .result-label {
+      font-size: 0.95rem;
+      color: #8a6d3b;
+      margin-bottom: 8px;
+    }
+
+    .result-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #e85d3f;
+      min-height: 2.2rem;
+    }
+
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .menu-input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: #ff9a62;
+      box-shadow: 0 0 0 4px rgba(255,154,98,0.15);
+    }
+
+    .add-btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      background: #333;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .info-text {
+      font-size: 0.92rem;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #eee;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .menu-name {
+      font-weight: 600;
+    }
+
+    .delete-btn {
+      border: none;
+      background: #ffe2e2;
+      color: #d64545;
+      border-radius: 12px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .recommend-box {
+      margin-top: 10px;
+    }
+
+    .recommend-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .recommend-tag {
+      border: 1px solid #f4d4b8;
+      background: #fff7ef;
+      color: #9a5b2d;
+      padding: 9px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.18s ease;
+    }
+
+    .recommend-tag:hover {
+      transform: translateY(-1px);
+      background: #ffe9d4;
+    }
+
+    .warning {
+      margin-top: 10px;
+      color: #d34c4c;
+      font-size: 0.92rem;
+      min-height: 1.2rem;
+    }
+
+    .count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 34px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #fff1df;
+      color: #b56b2e;
+      font-weight: 800;
+      margin-left: 8px;
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: #777;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+      padding: 20px;
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .result-modal {
+      position: relative;
+      width: min(92vw, 560px);
+      background: linear-gradient(135deg, #fff8ef, #ffffff);
+      border-radius: 28px;
+      padding: 34px 24px 26px;
+      text-align: center;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+      transform: scale(0.8) translateY(20px);
+      opacity: 0;
+    }
+
+    .result-glow {
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      background: radial-gradient(circle, rgba(255, 199, 95, 0.45), rgba(255, 255, 255, 0));
+      top: -70px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .modal-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ffd166, #ff9f1c);
+      color: #7a3f00;
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      color: #555;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .modal-menu {
+      font-size: clamp(2rem, 7vw, 3.5rem);
+      font-weight: 900;
+      line-height: 1.15;
+      margin: 12px 0 14px;
+      background: linear-gradient(135deg, #ff5f6d, #ff9a44, #ffd166);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 6px 20px rgba(255, 140, 0, 0.12);
+      position: relative;
+      z-index: 2;
+      word-break: keep-all;
+    }
+
+    .modal-desc {
+      color: #666;
+      font-size: 1rem;
+      margin-bottom: 22px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 2;
+    }
+
+    .modal-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 13px 22px;
+      font-size: 0.98rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .modal-btn.primary {
+      background: linear-gradient(135deg, #ff8a65, #ff5252);
+      color: white;
+      box-shadow: 0 10px 24px rgba(255, 82, 82, 0.25);
+    }
+
+    .modal-btn.secondary {
+      background: #f4f4f4;
+      color: #333;
+    }
+
+    #confettiContainer {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 10000;
+    }
+
+    .confetti {
+      position: absolute;
+      top: -20px;
+      width: 12px;
+      height: 18px;
+      opacity: 0.95;
+      border-radius: 2px;
+      will-change: transform, opacity;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .wheel-wrapper {
+        width: min(88vw, 460px);
+        height: min(88vw, 460px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="subtitle">오늘 뭐 먹지? 고민 끝. 룰렛이 대신 골라드립니다.</div>
+
+    <div class="layout">
+      <section class="card wheel-section">
+        <div class="wheel-wrapper">
+          <div class="pointer"></div>
+          <div id="wheelContainer">
+            <svg id="wheelSvg" viewBox="0 0 500 500"></svg>
+          </div>
+          <div class="wheel-ring"></div>
+        </div>
+
+        <button id="spinBtn" class="spin-btn">룰렛 돌리기</button>
+
+        <div class="result-box">
+          <div class="result-label">오늘의 추천 메뉴</div>
+          <div id="resultValue" class="result-value">준비 완료</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="panel-title">
+          메뉴 관리
+          <span id="countBadge" class="count-badge">5</span>
+        </div>
+
+        <div class="menu-input-row">
+          <input id="menuInput" type="text" placeholder="직접 메뉴 입력 (예: 김치찌개)" />
+          <button id="addBtn" class="add-btn">추가</button>
+        </div>
+
+        <div class="info-text">메뉴는 최소 2개, 최대 10개까지 설정할 수 있습니다.</div>
+
+        <div id="menuList" class="menu-list"></div>
+
+        <div class="recommend-box">
+          <div class="panel-title" style="margin-bottom: 6px;">추천 메뉴</div>
+          <div class="info-text">현재 메뉴에 없는 메뉴를 골라 빠르게 추가할 수 있어요.</div>
+          <div id="recommendList" class="recommend-list"></div>
+        </div>
+
+        <div id="warning" class="warning"></div>
+
+        <div class="footer-note">
+          팁: 메뉴가 적으면 선택이 단순해지고, 많으면 룰렛이 더 재밌어집니다.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay">
+    <div id="resultModal" class="result-modal">
+      <div class="result-glow"></div>
+      <div class="modal-badge">오늘의 점심 당첨</div>
+      <div class="modal-title">선택된 메뉴는</div>
+      <div id="modalMenu" class="modal-menu">파스타</div>
+      <div class="modal-desc">축하합니다. 오늘의 고민은 끝났습니다.</div>
+      <div class="modal-actions">
+        <button id="closeModalBtn" class="modal-btn secondary">닫기</button>
+        <button id="spinAgainBtn" class="modal-btn primary">다시 돌리기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confettiContainer"></div>
+
+  <script>
+    const defaultMenus = ["비빔밥", "돈까스", "김치찌개", "초밥", "파스타"];
+    const allRecommendations = [
+      "햄버거", "라멘", "쌀국수", "마라탕", "제육볶음",
+      "샌드위치", "떡볶이", "냉면", "칼국수", "삼겹살",
+      "우동", "오므라이스", "카레", "부대찌개", "짜장면",
+      "짬뽕", "쭈꾸미볶음", "타코", "샐러드", "닭갈비"
+    ];
+
+    const colors = [
+      "#E9DCC8", "#E9E7BC", "#D7E6D1", "#CFE4E8", "#D6DCE8",
+      "#E3D8F0", "#F2D7E7", "#F4D6D1", "#DCE9C6", "#F2D9C6"
+    ];
+
+    let menus = [...defaultMenus];
+    let currentRotation = 0;
+    let isSpinning = false;
+
+    const wheelSvg = document.getElementById("wheelSvg");
+    const menuList = document.getElementById("menuList");
+    const recommendList = document.getElementById("recommendList");
+    const resultValue = document.getElementById("resultValue");
+    const warning = document.getElementById("warning");
+    const countBadge = document.getElementById("countBadge");
+    const spinBtn = document.getElementById("spinBtn");
+    const addBtn = document.getElementById("addBtn");
+    const menuInput = document.getElementById("menuInput");
+    const wheelContainer = document.getElementById("wheelContainer");
+
+    const modalOverlay = document.getElementById("modalOverlay");
+    const resultModal = document.getElementById("resultModal");
+    const modalMenu = document.getElementById("modalMenu");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const spinAgainBtn = document.getElementById("spinAgainBtn");
+    const confettiContainer = document.getElementById("confettiContainer");
+
+    function degToRad(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    function polarToCartesian(cx, cy, r, angleDeg) {
+      const rad = degToRad(angleDeg - 90);
+      return {
+        x: cx + r * Math.cos(rad),
+        y: cy + r * Math.sin(rad)
+      };
+    }
+
+    function createSlicePath(cx, cy, r, startAngle, endAngle) {
+      const start = polarToCartesian(cx, cy, r, endAngle);
+      const end = polarToCartesian(cx, cy, r, startAngle);
+      const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+
+      return [
+        `M ${cx} ${cy}`,
+        `L ${start.x} ${start.y}`,
+        `A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+        "Z"
+      ].join(" ");
+    }
+
+    function truncateText(text, maxLength = 8) {
+      return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
+    }
+
+    function renderWheel() {
+      const cx = 250;
+      const cy = 250;
+      const r = 220;
+      const angleSize = 360 / menus.length;
+
+      wheelSvg.innerHTML = "";
+
+      menus.forEach((menu, i) => {
+        const startAngle = i * angleSize;
+        const endAngle = (i + 1) * angleSize;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", createSlicePath(cx, cy, r, startAngle, endAngle));
+        path.setAttribute("fill", colors[i % colors.length]);
+        path.setAttribute("stroke", "#f2eee8");
+        path.setAttribute("stroke-width", "3");
+        wheelSvg.appendChild(path);
+
+        const midAngle = startAngle + angleSize / 2;
+        const textRadius = r * 0.62;
+        const textPos = polarToCartesian(cx, cy, textRadius, midAngle);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", textPos.x);
+        text.setAttribute("y", textPos.y);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.setAttribute("font-size", menus.length >= 8 ? "15" : "18");
+        text.setAttribute("font-weight", "700");
+        text.setAttribute("fill", "#a8a8a8");
+        text.setAttribute("transform", `rotate(${midAngle}, ${textPos.x}, ${textPos.y})`);
+        text.textContent = truncateText(menu, 9);
+        wheelSvg.appendChild(text);
+      });
+
+      const centerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      centerCircle.setAttribute("cx", "250");
+      centerCircle.setAttribute("cy", "250");
+      centerCircle.setAttribute("r", "42");
+      centerCircle.setAttribute("fill", "#f5f2ee");
+      centerCircle.setAttribute("stroke", "#eadfcf");
+      centerCircle.setAttribute("stroke-width", "6");
+      wheelSvg.appendChild(centerCircle);
+
+      const centerText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      centerText.setAttribute("x", "250");
+      centerText.setAttribute("y", "250");
+      centerText.setAttribute("text-anchor", "middle");
+      centerText.setAttribute("dominant-baseline", "middle");
+      centerText.setAttribute("font-size", "16");
+      centerText.setAttribute("font-weight", "800");
+      centerText.setAttribute("fill", "#d3b48f");
+      centerText.textContent = "LUNCH";
+      wheelSvg.appendChild(centerText);
+    }
+
+    function renderMenuList() {
+      menuList.innerHTML = "";
+      menus.forEach((menu, index) => {
+        const item = document.createElement("div");
+        item.className = "menu-item";
+
+        const name = document.createElement("div");
+        name.className = "menu-name";
+        name.textContent = menu;
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "delete-btn";
+        delBtn.textContent = "삭제";
+        delBtn.onclick = () => removeMenu(index);
+
+        item.appendChild(name);
+        item.appendChild(delBtn);
+        menuList.appendChild(item);
+      });
+
+      countBadge.textContent = menus.length;
+    }
+
+    function getRecommendations() {
+      return allRecommendations
+        .filter(item => !menus.includes(item))
+        .slice(0, 5);
+    }
+
+    function renderRecommendations() {
+      recommendList.innerHTML = "";
+      const recs = getRecommendations();
+
+      recs.forEach(menu => {
+        const tag = document.createElement("button");
+        tag.className = "recommend-tag";
+        tag.textContent = `+ ${menu}`;
+        tag.onclick = () => addMenu(menu);
+        recommendList.appendChild(tag);
+      });
+    }
+
+    function showWarning(message = "") {
+      warning.textContent = message;
+    }
+
+    function addMenu(menuText) {
+      const menu = (menuText || menuInput.value).trim();
+
+      if (!menu) {
+        showWarning("메뉴 이름을 입력해주세요.");
+        return;
+      }
+      if (menus.includes(menu)) {
+        showWarning("이미 있는 메뉴입니다.");
+        return;
+      }
+      if (menus.length >= 10) {
+        showWarning("메뉴는 최대 10개까지만 가능합니다.");
+        return;
+      }
+
+      menus.push(menu);
+      menuInput.value = "";
+      showWarning("");
+      refreshUI();
+    }
+
+    function removeMenu(index) {
+      if (menus.length <= 2) {
+        showWarning("메뉴는 최소 2개 이상 있어야 합니다.");
+        return;
+      }
+      menus.splice(index, 1);
+      showWarning("");
+      refreshUI();
+    }
+
+    function refreshUI() {
+      renderWheel();
+      renderMenuList();
+      renderRecommendations();
+    }
+
+    function showResultModal(menuName) {
+      modalMenu.textContent = menuName;
+      modalOverlay.classList.add("show");
+
+      gsap.set(resultModal, { scale: 0.8, y: 20, opacity: 0 });
+      gsap.to(resultModal, {
+        scale: 1,
+        y: 0,
+        opacity: 1,
+        duration: 0.6,
+        ease: "back.out(1.7)"
+      });
+
+      gsap.fromTo(
+        modalMenu,
+        { scale: 0.7, opacity: 0, y: 20 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.7, ease: "back.out(2)" }
+      );
+
+      createConfettiBurst(90);
+    }
+
+    function closeResultModal() {
+      gsap.to(resultModal, {
+        scale: 0.9,
+        y: 10,
+        opacity: 0,
+        duration: 0.25,
+        ease: "power2.in",
+        onComplete: () => {
+          modalOverlay.classList.remove("show");
+        }
+      });
+    }
+
+    function createConfettiBurst(count = 80) {
+      confettiContainer.innerHTML = "";
+      const confettiColors = ["#ff6b6b", "#ffd166", "#06d6a0", "#4cc9f0", "#b5179e", "#ff9f1c"];
+
+      for (let i = 0; i < count; i++) {
+        const piece = document.createElement("div");
+        piece.className = "confetti";
+        piece.style.left = Math.random() * 100 + "vw";
+        piece.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+        piece.style.width = 8 + Math.random() * 10 + "px";
+        piece.style.height = 10 + Math.random() * 16 + "px";
+        piece.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+        confettiContainer.appendChild(piece);
+
+        const duration = 2.2 + Math.random() * 2.3;
+        const drift = -140 + Math.random() * 280;
+        const rotate = Math.random() * 900;
+        const startY = -40 - Math.random() * 120;
+        const endY = window.innerHeight + 80;
+
+        gsap.fromTo(
+          piece,
+          {
+            x: 0,
+            y: startY,
+            rotation: 0,
+            opacity: 1
+          },
+          {
+            x: drift,
+            y: endY,
+            rotation: rotate,
+            opacity: 1,
+            duration: duration,
+            ease: "power1.out",
+            onComplete: () => piece.remove()
+          }
+        );
+      }
+    }
+
+    function spinWheel() {
+      if (isSpinning) return;
+
+      if (menus.length < 2) {
+        showWarning("최소 2개 이상의 메뉴가 필요합니다.");
+        return;
+      }
+
+      isSpinning = true;
+      spinBtn.disabled = true;
+      showWarning("");
+      resultValue.textContent = "고르는 중...";
+
+      const selectedIndex = Math.floor(Math.random() * menus.length);
+      const anglePerSlice = 360 / menus.length;
+      const targetSliceCenter = selectedIndex * anglePerSlice + anglePerSlice / 2;
+      const finalNormalized = 360 - targetSliceCenter;
+      const extraSpins = 360 * (5 + Math.floor(Math.random() * 3));
+      const finalRotation = currentRotation + extraSpins + finalNormalized - (currentRotation % 360);
+
+      gsap.to(wheelContainer, {
+        rotation: finalRotation,
+        duration: 5,
+        ease: "power4.out",
+        onComplete: () => {
+          currentRotation = finalRotation % 360;
+          const selectedMenu = menus[selectedIndex];
+          resultValue.textContent = selectedMenu;
+          isSpinning = false;
+          spinBtn.disabled = false;
+          showResultModal(selectedMenu);
+        }
+      });
+    }
+
+    addBtn.addEventListener("click", () => addMenu());
+
+    menuInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addMenu();
+    });
+
+    spinBtn.addEventListener("click", spinWheel);
+
+    closeModalBtn.addEventListener("click", closeResultModal);
+
+    spinAgainBtn.addEventListener("click", () => {
+      closeResultModal();
+      setTimeout(() => {
+        spinWheel();
+      }, 250);
+    });
+
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) {
+        closeResultModal();
+      }
+    });
+
+    refreshUI();
+  </script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/shingu_a/sw.js");
+          console.log("Service Worker 등록 성공:", registration.scope);
+        } catch (error) {
+          console.log("Service Worker 등록 실패:", error);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
